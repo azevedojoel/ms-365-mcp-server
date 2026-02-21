@@ -636,3 +636,111 @@ export function registerDiscoveryTools(
     }
   );
 }
+
+/** Max results for contact briefing tools */
+const BRIEFING_EMAIL_LIMIT = 10;
+const SNIPPET_MAX_LENGTH = 200;
+
+export function registerBriefingTools(
+  server: McpServer,
+  graphClient: GraphClient,
+  readOnly: boolean
+): number {
+  if (readOnly === false) {
+    logger.info('Briefing tools are read-only; registering in read-only mode');
+  }
+
+  let count = 0;
+
+  server.tool(
+    'get-contact-email-briefing',
+    `Get a concise email briefing for a contact. Pass the contact's email (preferred) or name. Returns recent emails (subject, date, snippet) sorted by recency, ready for briefing preparation. No need to construct Graph API queries—the tool does it internally.`,
+    {
+      email: z
+        .string()
+        .describe('Contact email address (preferred identifier for search)')
+        .optional(),
+      name: z
+        .string()
+        .describe('Contact name (fallback when email not available; less precise for search)')
+        .optional(),
+      limit: z
+        .number()
+        .min(1)
+        .max(50)
+        .describe('Maximum number of emails to return (default: 10)')
+        .optional(),
+    },
+    {
+      title: 'get-contact-email-briefing',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
+    async (params) => {
+      const email = (params.email ?? '').trim();
+      const name = (params.name ?? '').trim();
+      const limit = params.limit ?? BRIEFING_EMAIL_LIMIT;
+
+      if (!email && !name) {
+        return {
+          content: [{ type: 'text', text: 'Error: Either email or name is required.' }],
+          isError: true,
+        };
+      }
+
+      const kql = email ? `from:${email}` : `from:${name}`;
+
+      try {
+        const queryParams = new URLSearchParams({
+          $search: `"${kql}"`,
+          $top: String(Math.min(limit, 50)),
+          $select: 'subject,receivedDateTime,bodyPreview,from,toRecipients',
+        });
+
+        const path = `/me/messages?${queryParams.toString()}`;
+        const response = await graphClient.graphRequest(path, { method: 'GET' });
+
+        if (response.isError || !response.content?.[0]?.text) {
+          return response;
+        }
+
+        const data = JSON.parse(response.content[0].text) as Record<string, unknown>;
+        const rawError = data?.error;
+        if (rawError) {
+          const msg = typeof rawError === 'string' ? rawError : (rawError as { message?: string }).message ?? 'Unknown error';
+          return { content: [{ type: 'text', text: `Error: ${msg}` }], isError: true };
+        }
+
+        const items = (data?.value ?? []) as Array<{
+          subject?: string;
+          receivedDateTime?: string;
+          bodyPreview?: string;
+          from?: { emailAddress?: { address?: string; name?: string } };
+        }>;
+
+        const lines = items.map((m) => {
+          const date = m?.receivedDateTime ?? '';
+          const subj = String(m?.subject ?? '');
+          const snip = (m?.bodyPreview ?? '').slice(0, SNIPPET_MAX_LENGTH);
+          return `${date} | ${subj}\n${snip}`;
+        });
+
+        const text = lines.length === 0
+          ? '(no emails found)'
+          : lines.join('\n---\n');
+
+        return { content: [{ type: 'text', text }] };
+      } catch (error) {
+        logger.error(`get-contact-email-briefing failed: ${(error as Error).message}`);
+        return {
+          content: [{ type: 'text', text: `Error: ${(error as Error).message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+  count++;
+
+  logger.info(`Briefing tools registered: ${count}`);
+  return count;
+}

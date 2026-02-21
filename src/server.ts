@@ -5,7 +5,7 @@ import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import express, { Request, Response } from 'express';
 import logger, { enableConsoleLogging } from './logger.js';
 import { registerAuthTools } from './auth-tools.js';
-import { registerGraphTools, registerDiscoveryTools } from './graph-tools.js';
+import { registerGraphTools, registerDiscoveryTools, registerBriefingTools } from './graph-tools.js';
 import GraphClient from './graph-client.js';
 import AuthManager, { buildScopesFromEndpoints } from './auth.js';
 import { MicrosoftOAuthProvider } from './oauth-provider.js';
@@ -94,6 +94,7 @@ class MicrosoftGraphServer {
         this.options.enabledTools,
         this.options.orgMode
       );
+      registerBriefingTools(this.server, this.graphClient, true);
     }
   }
 
