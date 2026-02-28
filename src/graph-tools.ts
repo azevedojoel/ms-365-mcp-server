@@ -744,3 +744,121 @@ export function registerBriefingTools(
   logger.info(`Briefing tools registered: ${count}`);
   return count;
 }
+
+const BATCH_SIZE = 20;
+
+export function registerMoveMailMessagesMany(
+  server: McpServer,
+  graphClient: GraphClient,
+  readOnly: boolean,
+  enabledToolsPattern?: string
+): void {
+  if (readOnly) {
+    logger.info('Skipping move-mail-messages-many (read-only mode)');
+    return;
+  }
+
+  if (enabledToolsPattern) {
+    try {
+      const regex = new RegExp(enabledToolsPattern, 'i');
+      if (!regex.test('move-mail-messages-many')) {
+        logger.info('Skipping move-mail-messages-many (does not match tool filter)');
+        return;
+      }
+    } catch {
+      logger.warn('Invalid enabled tools pattern, registering move-mail-messages-many');
+    }
+  }
+
+  server.tool(
+    'move-mail-messages-many',
+    `Move or archive multiple email messages in one call. Pass an array of message IDs and optionally a destination folder ID. Use "archive" for the well-known Archive folder. Token-efficient alternative to multiple move-mail-message calls.`,
+    {
+      messageIds: z
+        .array(z.string())
+        .min(1)
+        .max(100)
+        .describe('Array of message IDs to move (from list-mail-messages or list-mail-folder-messages)'),
+      destinationFolderId: z
+        .string()
+        .default('archive')
+        .describe(
+          'Destination folder ID. Use "archive" for Archive, "deleteditems" for Trash, or a folder ID from list-mail-folders'
+        )
+        .optional(),
+    },
+    {
+      title: 'move-mail-messages-many',
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: true,
+    },
+    async ({ messageIds, destinationFolderId = 'archive' }) => {
+      const results: { moved: number; failed: number; errors: string[] } = {
+        moved: 0,
+        failed: 0,
+        errors: [],
+      };
+
+      for (let i = 0; i < messageIds.length; i += BATCH_SIZE) {
+        const chunk = messageIds.slice(i, i + BATCH_SIZE);
+        const requests = chunk.map((id, idx) => ({
+          id: String(i + idx + 1),
+          method: 'POST' as const,
+          url: `/me/messages/${encodeURIComponent(id)}/move`,
+          body: { destinationId: destinationFolderId },
+        }));
+
+        try {
+          const batchResponse = await graphClient.graphRequest('/$batch', {
+            method: 'POST',
+            body: JSON.stringify({ requests }),
+          });
+
+          const text = batchResponse.content?.[0]?.text;
+          if (!text) {
+            results.failed += chunk.length;
+            results.errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: No response`);
+            continue;
+          }
+
+          const parsed = JSON.parse(text) as { responses?: Array<{ id: string; status: number; body?: { error?: { message?: string } } }> };
+          const responses = parsed.responses ?? parsed;
+
+          for (const resp of Array.isArray(responses) ? responses : []) {
+            if (resp.status >= 200 && resp.status < 300) {
+              results.moved++;
+            } else {
+              results.failed++;
+              const errMsg = resp.body?.error?.message ?? `Status ${resp.status}`;
+              results.errors.push(`ID ${resp.id}: ${errMsg}`);
+            }
+          }
+        } catch (error) {
+          results.failed += chunk.length;
+          results.errors.push(`Batch error: ${(error as Error).message}`);
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify(
+              {
+                moved: results.moved,
+                failed: results.failed,
+                total: messageIds.length,
+                errors: results.errors.length > 0 ? results.errors : undefined,
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: results.failed > 0,
+      };
+    }
+  );
+  logger.info('Registered move-mail-messages-many tool');
+}

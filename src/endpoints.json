@@ -431,48 +431,6 @@
     "scopes": ["Tasks.ReadWrite"]
   },
   {
-    "pathPattern": "/me/planner/tasks",
-    "method": "get",
-    "toolName": "list-planner-tasks",
-    "scopes": ["Tasks.Read"]
-  },
-  {
-    "pathPattern": "/planner/plans/{plannerPlan-id}",
-    "method": "get",
-    "toolName": "get-planner-plan",
-    "scopes": ["Tasks.Read"]
-  },
-  {
-    "pathPattern": "/planner/plans/{plannerPlan-id}/tasks",
-    "method": "get",
-    "toolName": "list-plan-tasks",
-    "scopes": ["Tasks.Read"]
-  },
-  {
-    "pathPattern": "/planner/tasks/{plannerTask-id}",
-    "method": "get",
-    "toolName": "get-planner-task",
-    "scopes": ["Tasks.Read"]
-  },
-  {
-    "pathPattern": "/planner/tasks",
-    "method": "post",
-    "toolName": "create-planner-task",
-    "scopes": ["Tasks.ReadWrite"]
-  },
-  {
-    "pathPattern": "/planner/tasks/{plannerTask-id}",
-    "method": "patch",
-    "toolName": "update-planner-task",
-    "scopes": ["Tasks.ReadWrite"]
-  },
-  {
-    "pathPattern": "/planner/tasks/{plannerTask-id}/details",
-    "method": "patch",
-    "toolName": "update-planner-task-details",
-    "scopes": ["Tasks.ReadWrite"]
-  },
-  {
     "pathPattern": "/me/contacts",
     "method": "get",
     "toolName": "list-outlook-contacts",

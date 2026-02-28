@@ -30,7 +30,7 @@ export const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   },
   work: {
     name: 'work',
-    pattern: /team|channel|chat|sharepoint|planner|site|list|shared|search|query/i,
+    pattern: /team|channel|chat|sharepoint|site|list|shared|search|query/i,
     description: 'Organization/work tools (Teams, SharePoint, shared mailboxes, search)',
     requiresOrgMode: true,
   },
@@ -46,8 +46,8 @@ export const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   },
   tasks: {
     name: 'tasks',
-    pattern: /todo|planner|task/i,
-    description: 'Task and planning tools (To Do, Planner)',
+    pattern: /todo|task/i,
+    description: 'To Do task management',
   },
   onenote: {
     name: 'onenote',
@@ -64,6 +64,12 @@ export const TOOL_CATEGORIES: Record<string, ToolCategory> = {
     pattern: /user|list-users/i,
     description: 'User directory access',
     requiresOrgMode: true,
+  },
+  smb: {
+    name: 'smb',
+    pattern:
+      /mail|calendar|contact|drive|file|folder|todo|event|message|draft|attachment|search|user|briefing/i,
+    description: 'SMB essentials: mail, calendar, contacts, OneDrive, To Do, search',
   },
   all: {
     name: 'all',
